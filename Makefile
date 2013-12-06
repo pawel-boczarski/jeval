@@ -1,2 +1,2 @@
-jeval:
-	gcc -o jeval jeval_main.c -lncurses
+jeval:	jeval_main.c ops.c
+	gcc -o jeval jeval_main.c -lncurses -lpthread -g

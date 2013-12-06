@@ -1,7 +1,25 @@
 #include <ncurses.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
 
-char *curbuf = 0;
-char **substrs = 0;
+volatile char *curbuf = 0;
+volatile char **substrs = 0;
+
+pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
+pthread_t current_task;
+
+int wait_pos = -1;
+
+struct timespec sleep_interval = { .tv_sec = 0, .tv_nsec = 1000000 };
+
+#define TS_NONE 0
+#define TS_WAITING 1
+#define TS_OK 2
+#define TS_RESPONSE 3
+#define TS_CANCEL 4
+
+int thread_state = 0;
 
 int curbuf_len()
 {
@@ -103,6 +121,10 @@ void write_tokens(WINDOW *win)
 
 	mvwprintw(win, 0, 2, "Tokens...");
 
+	static char *tst[] = { "NONE", "WAITING", "OK", "RESPONSE" };
+
+	mvwprintw(win, 0, 20, "[ thread state : '%s' ]", tst[thread_state]);	
+
 	if(!substrs)
 	{
 		mvwprintw(win, 1, 2, "No subtokens!");
@@ -156,8 +178,6 @@ void push_token(char *tok)
 
 	substrs[currsize] = 0;
 	substrs[currsize - 1] = tok;
-	
-	
 }
 
 struct op
@@ -169,10 +189,11 @@ struct op
 #include "ops.c"
 
 struct op ops[] = {
-	{ "+", &plus },
-	{ "-", &minus },
-	{ "*", &mul },
-	{ "-", &div },
+	{ "+", &_plus },
+	{ "-", &_minus },
+	{ "*", &_mul },
+	{ "-", &_div },
+	{ "++", &_new_plus },
 	{ NULL, NULL }
 };
 
@@ -235,6 +256,11 @@ int main()
 				move(y, x-1);
 				printw(" ");
 				move(y, x-1);
+
+				if(curbuf_len() < wait_pos)
+				{
+					thread_state = TS_CANCEL;
+				}
 			}
 			curbuf_delete_char();
 			tokenize();
@@ -244,23 +270,46 @@ int main()
 		{
 			char *tok = get_token_from_end(0);
 
-			if(tok)
+			if(thread_state == TS_NONE)
 			{
 				void (*op)() = get_op(tok);
 				if(op)
 				{
-				op();
-				rebuildstr();
+					pthread_create( &current_task, NULL, op, NULL );
+					while( thread_state == TS_NONE) nanosleep(&sleep_interval, NULL);
+					if( thread_state == TS_OK)
+					{
+						pthread_join( current_task, NULL );
+						memset(&current_task, 0, sizeof(current_task));
+						thread_state = TS_NONE;
+					}
+					else if( thread_state == TS_WAITING)
+					{
+						// to restore on cancel
+						wait_pos = curbuf_len();
+					}
 
-				int x, y;
-				getyx(stdscr, y, x);
-
-				mvprintw(y, 0, "%50s", " ");
-				mvprintw(y, 0, "[%d] %4d > %s", ch, curbuf_len(), curbuf);
-
-				write_tokens(win);
+					rebuildstr();
 				}
+
 			}
+			else
+			{
+				thread_state = TS_RESPONSE;
+				pthread_join( current_task, NULL );
+				memset(&current_task, 0, sizeof(current_task));
+				thread_state = TS_NONE;
+
+				rebuildstr();
+			}
+				
+			int x, y;
+			getyx(stdscr, y, x);
+
+			mvprintw(y, 0, "%50s", " ");
+			mvprintw(y, 0, "[%d] %4d > %s", ch, curbuf_len(), curbuf);
+
+			write_tokens(win);
 
 			if(ch == ' ')
 			{
