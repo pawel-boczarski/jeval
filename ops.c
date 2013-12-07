@@ -159,11 +159,56 @@ void _div()
 	}		
 }
 
+void _addall()
+{
+	int acc = 0;
+	char *tok;
+
+	SIGNAL_OK();
+
+	int no_tok = 1;
+
+	tok = get_token_from_end(1);
+	int last_token_no = get_token_last_no();
+
+	if(strcmp(tok, "]") != 0) return;
+
+	for(no_tok = 1 ; no_tok <= last_token_no; ++no_tok)
+	{
+		tok = get_token_from_end(no_tok);
+
+		if(strcmp(tok, "[") == 0)
+			goto found_bra;
+	}
+
+	return;
+
+found_bra:
+	pop_last_token();	// addall
+	pop_last_token();	// ]
+	while(strcmp(get_token_from_end(0), "[") != 0)
+	{
+		tok = get_token_from_end(0);
+
+		acc += atoi(tok);
+		pop_last_token();
+	}
+
+	pop_last_token();	// [
+	
+	char *new_token = calloc(1, 50);
+
+	snprintf(new_token, 50, "%d", acc);
+
+	push_token(new_token);
+}
+
 struct op ops[] = {
 	{ "+", &_plus },
 	{ "-", &_minus },
 	{ "*", &_mul },
 	{ "-", &_div },
 	{ "++", &_new_plus },
+        { "addall", &_addall },
 	{ NULL, NULL }
 };
