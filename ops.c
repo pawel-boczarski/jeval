@@ -1,7 +1,9 @@
-#define SIGNAL_OK() (thread_state = TS_OK)
-#define SIGNAL_WAIT() do { thread_state = TS_WAITING; do { \
-		nanosleep(&sleep_interval, NULL); \
-		} while(thread_state == TS_WAITING); } while(0)
+#include <ncurses.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+#include "model_api.h"
 
 void _plus()
 {
@@ -156,3 +158,12 @@ void _div()
 		push_token(tok);
 	}		
 }
+
+struct op ops[] = {
+	{ "+", &_plus },
+	{ "-", &_minus },
+	{ "*", &_mul },
+	{ "-", &_div },
+	{ "++", &_new_plus },
+	{ NULL, NULL }
+};

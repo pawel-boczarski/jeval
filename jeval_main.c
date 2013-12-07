@@ -3,6 +3,8 @@
 #include <string.h>
 #include <pthread.h>
 
+#include "model_api.h"
+
 volatile char *curbuf = 0;
 volatile char **substrs = 0;
 
@@ -12,12 +14,6 @@ pthread_t current_task;
 int wait_pos = -1;
 
 struct timespec sleep_interval = { .tv_sec = 0, .tv_nsec = 1000000 };
-
-#define TS_NONE 0
-#define TS_WAITING 1
-#define TS_OK 2
-#define TS_RESPONSE 3
-#define TS_CANCEL 4
 
 int thread_state = 0;
 
@@ -121,7 +117,7 @@ void write_tokens(WINDOW *win)
 
 	mvwprintw(win, 0, 2, "Tokens...");
 
-	static char *tst[] = { "NONE", "WAITING", "OK", "RESPONSE" };
+	static char *tst[] = { "NONE", "WAITING", "OK", "RESPONSE", "CANCEL" };
 
 	mvwprintw(win, 0, 20, "[ thread state : '%s' ]", tst[thread_state]);	
 
@@ -143,6 +139,8 @@ void write_tokens(WINDOW *win)
 
 char* get_token_from_end(int i)
 {
+	if(!substrs) return NULL;
+
 	int last = 0; for( ; substrs[last] ; ++last); --last;
 
 	if(last - i < 0)
@@ -179,23 +177,6 @@ void push_token(char *tok)
 	substrs[currsize] = 0;
 	substrs[currsize - 1] = tok;
 }
-
-struct op
-{
-	char *name;
-	void (*value);
-};
-
-#include "ops.c"
-
-struct op ops[] = {
-	{ "+", &_plus },
-	{ "-", &_minus },
-	{ "*", &_mul },
-	{ "-", &_div },
-	{ "++", &_new_plus },
-	{ NULL, NULL }
-};
 
 void * get_op(char *name)
 {
@@ -257,9 +238,15 @@ int main()
 				printw(" ");
 				move(y, x-1);
 
-				if(curbuf_len() < wait_pos)
+						{int y,x; getyx(stdscr, y, x);
+						mvprintw(14, 15, "curbuf_len(): %d", curbuf_len()); mvprintw(y,x, "");}
+
+				if(curbuf_len() - 1 < wait_pos)
 				{
 					thread_state = TS_CANCEL;
+					pthread_join( current_task, NULL );
+					memset(&current_task, 0, sizeof(current_task));
+					thread_state = TS_NONE;
 				}
 			}
 			curbuf_delete_char();
@@ -270,6 +257,8 @@ int main()
 		{
 			char *tok = get_token_from_end(0);
 
+			if(tok)
+			{
 			if(thread_state == TS_NONE)
 			{
 				void (*op)() = get_op(tok);
@@ -287,6 +276,9 @@ int main()
 					{
 						// to restore on cancel
 						wait_pos = curbuf_len();
+
+						int y,x; getyx(stdscr, y, x);
+						mvprintw(15, 15, "wait_pos: %d", wait_pos); mvprintw(y,x, "");
 					}
 
 					rebuildstr();
@@ -301,6 +293,7 @@ int main()
 				thread_state = TS_NONE;
 
 				rebuildstr();
+			}
 			}
 				
 			int x, y;
