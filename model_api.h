@@ -15,7 +15,6 @@ struct op
 
 extern struct op ops[];
 
-
 // op -> main signalling
 #define SIGNAL_OK() (thread_state = TS_OK)
 
@@ -49,5 +48,11 @@ void pop_last_token();
  pushes new token. Must be allocated.
 */
 void push_token(char *tok);
+
+/*
+ gets operator function by name.
+ Used by those operators, that operate on other operators
+*/
+void * get_op(char *name);
 
 #endif

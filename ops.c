@@ -218,6 +218,41 @@ void _nelem()
 	push_token(new_token);
 }
 
+void _rep()
+{
+	SIGNAL_WAIT();
+
+	if(thread_state == TS_CANCEL)
+		return;
+
+	if(!get_token_from_end(2)) {
+		SIGNAL_OK();
+		return;
+	}
+
+	int repcount = atoi(get_token_from_end(2));
+	char *oper = get_token_from_end(0);
+
+	SIGNAL_OK();
+
+	void (*op)() = get_op(oper);
+
+	if(!op)
+		return;
+
+	pop_last_token(); // op
+	pop_last_token();
+	pop_last_token();
+
+	while(repcount--)
+	{
+		char *oper_token = strdup(oper);
+
+		push_token(oper);
+		op();
+	}
+}
+
 struct op ops[] = {
 	{ "+", &_plus },
 	{ "-", &_minus },
@@ -226,5 +261,6 @@ struct op ops[] = {
 	{ "++", &_new_plus },
         { "addall", &_addall },
 	{ "nelem", &_nelem },
+	{ "rep", &_rep },
 	{ NULL, NULL }
 };
