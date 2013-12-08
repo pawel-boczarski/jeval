@@ -8,6 +8,13 @@
 volatile char *curbuf = 0;
 volatile char **substrs = 0;
 
+// used for batch mode
+char *lastbuf = 0;
+
+int batch = 0;
+
+//#define my_getyx(s, y, x) do { if(!batch) getyx(s, y, x); } while(0)
+
 pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
 pthread_t current_task;
 
@@ -190,11 +197,21 @@ void * get_op(char *name)
 	return opsp->value;
 }
 
-int main()
+int main(int argc, char *argv[])
 {
 	WINDOW *win;
 	int ch;
+	int batch = 0;
+	int endflag = 0;
+	int i;
+	for(i = 0; i < argc; i++)
+	{
+		if(strcmp(argv[i], "--batch") == 0)
+			batch = 1;
+	}
 
+	if(!batch)
+	{
 	initscr();
 	raw();
 	keypad(stdscr, TRUE);
@@ -211,35 +228,54 @@ int main()
 	printw("%4d > ", curbuf_len());
 
 	mvwprintw(win, 0, 2, "Tokens...");
+	}
 
-	while(ch != 27) {
-		ch = getch();
+	while((!batch && ch != 27) || (batch && ch != 13 && ch != 10 && !endflag ) ) {
+		if(!batch)
+			ch = getch();
+		else
+		{
+			int val = fgetc(stdin);
+			if(val == EOF) endflag = 1;
+			ch = (char)val;
+		}
 		
 		if(ch == 27) break;
 		
 		if(ch == 10 || ch == 13) {
+			free(lastbuf);
+			lastbuf = 0;
+			if(curbuf)
+				lastbuf = strdup(curbuf);
 			free(curbuf);
 			curbuf = 0;
-			int x, y;
-			getyx(stdscr, y, x);
-			move(y+1, 0);
-			printw("[%d] %4d > ", ch, curbuf_len());
+			if(!batch)
+			{
+				int x, y;
+				getyx(stdscr, y, x);
+				move(y+1, 0);
+				printw("[%d] %4d > ", ch, curbuf_len());
+			}
 
 			continue;
 		}
 		else
-		if(ch == KEY_BACKSPACE)
+		if(!batch && ch == KEY_BACKSPACE)
 		{
 			if(curbuf_len() > 0)
 			{
 				int x, y;
-				getyx(stdscr, y, x);
-				move(y, x-1);
-				printw(" ");
-				move(y, x-1);
+
+				if(!batch)
+				{
+					getyx(stdscr, y, x);
+					move(y, x-1);
+					printw(" ");
+					move(y, x-1);
 
 						{int y,x; getyx(stdscr, y, x);
 						mvprintw(14, 15, "curbuf_len(): %d", curbuf_len()); mvprintw(y,x, "");}
+				}
 
 				if(curbuf_len() - 1 < wait_pos)
 				{
@@ -251,9 +287,9 @@ int main()
 			}
 			curbuf_delete_char();
 			tokenize();
-			write_tokens(win);
+			if(!batch) write_tokens(win);
 		}
-		else if(ch == KEY_F(2) || ch == ' ')
+		else if((!batch && ch == KEY_F(2)) || (batch && endflag) || ch == ' ')
 		{
 			char *tok = get_token_from_end(0);
 
@@ -277,8 +313,11 @@ int main()
 						// to restore on cancel
 						wait_pos = curbuf_len();
 
-						int y,x; getyx(stdscr, y, x);
-						mvprintw(15, 15, "wait_pos: %d", wait_pos); mvprintw(y,x, "");
+						if(!batch)
+						{
+							int y,x; getyx(stdscr, y, x);
+							mvprintw(15, 15, "wait_pos: %d", wait_pos); mvprintw(y,x, "");
+						}
 					}
 
 					rebuildstr();
@@ -296,19 +335,25 @@ int main()
 			}
 			}
 				
-			int x, y;
-			getyx(stdscr, y, x);
+			if(!batch)
+			{
+				int x, y;
+				getyx(stdscr, y, x);
 
-			mvprintw(y, 0, "%50s", " ");
-			mvprintw(y, 0, "[%d] %4d > %s", ch, curbuf_len(), curbuf);
+				mvprintw(y, 0, "%50s", " ");
+				mvprintw(y, 0, "[%d] %4d > %s", ch, curbuf_len(), curbuf);
 
-			write_tokens(win);
+				write_tokens(win);
+			}
 
 			if(ch == ' ')
 			{
 				curbuf_append_char(ch);
 				tokenize();
-				write_tokens(win);
+				if(!batch) write_tokens(win);
+			}
+			else
+			{
 			}
 		}
 		else
@@ -316,18 +361,28 @@ int main()
 			//printw("%c", ch);
 			curbuf_append_char(ch);
 			tokenize();
-			write_tokens(win);
+			if(!batch) write_tokens(win);
 		}
-		
-		int x, y;
-		getyx(stdscr, y, x);
-		move(y, 0);
-		printw("[%d] %4d > %s", ch, curbuf_len(), curbuf);
-	}
-	endwin();
 
+		if(!batch)
+		{		
+			int x, y;
+			getyx(stdscr, y, x);
+			move(y, 0);
+			printw("[%d] %4d > %s", ch, curbuf_len(), curbuf);
+		}
+	}
 	
-	printf("curbuf: %s\n", curbuf);
+	if(!batch) endwin();
+	
+	if(lastbuf)
+		printf("lastbuf: %s\n", lastbuf);
+
+	if(curbuf)
+		printf("curbuf: %s\n", curbuf);
+
+	if(!lastbuf && !curbuf)
+		printf("lastbuf and curbuf empty\n");
 
 	return 0;
 }
