@@ -203,6 +203,21 @@ found_bra:
 	push_token(new_token);
 }
 
+void _nelem()
+{
+	int n = get_token_last_no();
+
+	SIGNAL_OK();
+
+	char *new_token = calloc(1, 50);
+
+	snprintf(new_token, 50, "%d", n);
+
+	pop_last_token(); // nelem
+
+	push_token(new_token);
+}
+
 struct op ops[] = {
 	{ "+", &_plus },
 	{ "-", &_minus },
@@ -210,5 +225,6 @@ struct op ops[] = {
 	{ "-", &_div },
 	{ "++", &_new_plus },
         { "addall", &_addall },
+	{ "nelem", &_nelem },
 	{ NULL, NULL }
 };
