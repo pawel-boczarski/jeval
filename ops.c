@@ -21,7 +21,7 @@ void _plus()
 		b = atoi(tok2);
 
 		sprintf(tok, "%d", a + b);
-		realloc(tok, strlen(tok) + 1);
+		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
 		pop_last_token();
@@ -87,6 +87,34 @@ void _new_plus()
 
 }
 
+/*void _reverse_plus()
+{
+	char *tok1;
+	char *tok2;
+
+	SIGNAL_WAIT();
+	SIGNAL_WAIT();
+
+	tok1 = get_token_from_end(0);
+	tok2 = get_token_from_end(1);
+
+	SIGNAL_OK();
+
+	if(tok1 && tok2)
+	{
+		char *tok = malloc(50);
+
+		snprintf(tok, 50, "%d", atoi(tok1) + atoi(tok2));
+
+
+		pop_last_token();
+		pop_last_token();
+		pop_last_token();
+
+		push_token(tok);
+	}
+}*/
+
 void _minus()
 {
 	int a, b;
@@ -101,7 +129,7 @@ void _minus()
 		b = atoi(tok2);
 
 		sprintf(tok, "%d", a - b);
-		realloc(tok, strlen(tok) + 1);
+		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
 		pop_last_token();
@@ -125,7 +153,7 @@ void _mul()
 		b = atoi(tok2);
 
 		sprintf(tok, "%d", a * b);
-		realloc(tok, strlen(tok) + 1);
+		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
 		pop_last_token();
@@ -149,7 +177,31 @@ void _div()
 		b = atoi(tok2);
 
 		sprintf(tok, "%d", a / b);
-		realloc(tok, strlen(tok) + 1);
+		tok = realloc(tok, strlen(tok) + 1);
+
+		pop_last_token();
+		pop_last_token();
+		pop_last_token();
+
+		push_token(tok);
+	}		
+}
+
+void _mod()
+{
+	int a, b;
+	char *tok1, *tok2;
+
+	SIGNAL_OK();
+
+	if( (tok1 = get_token_from_end(1)) && (tok2 = get_token_from_end(2)) )
+	{
+		char *tok = malloc(50);
+		a = atoi(tok1);
+		b = atoi(tok2);
+
+		sprintf(tok, "%d", a % b);
+		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
 		pop_last_token();
@@ -253,14 +305,56 @@ void _rep()
 	}
 }
 
+void _if()
+{
+	char *last_tok = strdup(get_token_from_end(1));
+
+	if(!last_tok) {
+		SIGNAL_OK();
+		return;
+	}
+	else
+	{
+		SIGNAL_WAIT();
+		SIGNAL_WAIT();
+
+		char *tok_true = get_token_from_end(1);
+		char *tok_false = get_token_from_end(0);
+		char *tok_push=  NULL;
+
+		if((strcmp(last_tok, "0") == 0) || (strcmp(last_tok, "0.0") == 0))
+		{
+			tok_push = strdup(tok_false);	
+		}
+		else
+		{
+			tok_push = strdup(tok_true);
+		}
+
+		SIGNAL_OK();
+
+		pop_last_token();
+		pop_last_token();
+		pop_last_token();
+		pop_last_token();
+
+		push_token(tok_push);
+
+		free(last_tok);
+	}
+}
+
 struct op ops[] = {
 	{ "+", &_plus },
 	{ "-", &_minus },
 	{ "*", &_mul },
-	{ "-", &_div },
+	{ "/", &_div },
+	{ "mod", &_mod },
 	{ "++", &_new_plus },
+//	{ "r+", &_reverse_plus },
         { "addall", &_addall },
 	{ "nelem", &_nelem },
 	{ "rep", &_rep },
+	{ "if", &_if },
 	{ NULL, NULL }
 };
