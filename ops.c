@@ -200,7 +200,7 @@ void _mod()
 		a = atoi(tok1);
 		b = atoi(tok2);
 
-		sprintf(tok, "%d", a % b);
+		sprintf(tok, "%d", b % a);
 		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
@@ -344,6 +344,42 @@ void _if()
 	}
 }
 
+void _nil()
+{
+	SIGNAL_OK();
+
+	pop_last_token();
+}
+
+void _chain_eval()
+{
+	if(get_token_last_no() == 0)
+	{
+		SIGNAL_OK();
+		return;
+	}
+
+	else
+	{
+		char *oper = get_token_from_end(1);
+
+		if(oper)
+		{
+			pop_last_token();
+
+			void *(*op)() = get_op(oper);
+
+			if(!op)
+			{
+				SIGNAL_OK();
+				return;
+			}
+			else
+				op(); // note op is down to signal now
+		}
+	}
+}
+
 struct op ops[] = {
 	{ "+", &_plus },
 	{ "-", &_minus },
@@ -356,5 +392,7 @@ struct op ops[] = {
 	{ "nelem", &_nelem },
 	{ "rep", &_rep },
 	{ "if", &_if },
+	{ "nil", &_nil },
+	{ ",", &_chain_eval },
 	{ NULL, NULL }
 };

@@ -203,11 +203,15 @@ int main(int argc, char *argv[])
 	int ch;
 	int batch = 0;
 	int endflag = 0;
+	int no_chain_eval = 0;
 	int i;
 	for(i = 0; i < argc; i++)
 	{
 		if(strcmp(argv[i], "--batch") == 0)
 			batch = 1;
+
+		if(strcmp(argv[i], "--no-chain-eval") == 0)
+			no_chain_eval = 1;
 	}
 
 	if(!batch)
@@ -231,6 +235,12 @@ int main(int argc, char *argv[])
 	}
 
 	while((!batch && ch != 27) || (batch && ch != 13 && ch != 10 && !endflag ) ) {
+
+		// some ops may leave operator on stack and it needs to be evaluated
+		//if(curbuf[strlen(curbuf) - 1] == ' ')
+		//{
+		//}
+
 		if(!batch)
 			ch = getch();
 		else
