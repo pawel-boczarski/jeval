@@ -130,16 +130,87 @@ Or even better:
 
 => it produces zero on beginning, but + "eats" it.
 
+OPERATOR: if
+SYNTAX: op_cond if op_true op_false
+	op_cond - true or false value - "0" and "0.0" evaluate to false,
+                  others - to true
+        op_true - operand to be pushed on stack when true
+        op_false - operand to be pushed on stack when false
+
+Sample:
+
+1 if 10 15
+
+=> yields 10
+
+0 if 10 15
+
+=> yields 15
+
+10 15 0 if * + 
+
+=> yields 10 15 +
+
+10 15 1.0 if * +
+
+=> yields 10 15 *
+
+WARNING: The operator will not be evaluated by default !!!
+This is because sometimes when operation fails operator may remain on the stack,
+and we would enter an infinite loop. So operators left on stack by operators
+are NOT evaluated at once. They can be evaluated in two ways:
+
+- adding second space after expression to force evaluation,
+- using chain-eval operator
+
+OPERATOR: , 	[aka chain-eval operator]
+SYNTAX: op ,
+	op - another operator that was not evaluated because it was left on stack
+	     as a result of operator function output
+
+Chain-eval operator simply evaluates the last operator on stack. If there is no operator function
+for it, it exits. If not, it pops itself off stack and calls the preceding operator.
+
+Example:
+
+10 15 0 if * + ,
+
+=> yields 25
+
+10 15 1 if * + ,
+
+=> yields 150
+
+
+Note: using double space after an expression works exactly same as calling chain-eval operator.
+
 Enjoy :).
 
+
+
+
 Note: it's not necessary to press ENTER after expression in ncurses mode, space is sufficient.
-You can always restart by removing any part of expression you like with Backspace,
-but it won't work if two-handed function waits for more than one argument !
-With ++ and rep functions it works, anyway.
+You can always back out by removing any part of expression you like with Backspace.
+Anyway, evaluated operators are evaluated already.
+To restart, simply remove all expression.
+
+WARNING
+Backing out with Backspace won't work if two-handed function waits for more than one argument, and at least
+one of the right hand argument was already confirmed (followed by space).
+(This is, it will work, but in case you wrote some right-hand arguments and confirmed with space,
+the operator has received them already and can't back out).
+So, to restart such operator evaluation, remove it up and including the operator.
+
+With ++ and rep functions it works, anyway, they only take one right-hand argument, so evaluate right after
+the first right-hand argument consumption.
 
 BATCH MODE
 
 For batch use --batch switch.
 It takes expressions from stdin.
 Currently it will only eval the last expression!
+
+From the shell perform:
+$ cat > ./jeval --batch
+Now type your expression and press Ctrl-D twice.
 
