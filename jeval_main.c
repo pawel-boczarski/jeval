@@ -324,12 +324,16 @@ int main(int argc, char *argv[])
 				}
 
 			}
-			else
+			else /*TS_WAITING */
 			{
 				thread_state = TS_RESPONSE;
-				pthread_join( current_task, NULL );
-				memset(&current_task, 0, sizeof(current_task));
-				thread_state = TS_NONE;
+				while( thread_state == TS_RESPONSE) nanosleep(&sleep_interval, NULL);
+				if( thread_state == TS_OK)
+				{
+					pthread_join( current_task, NULL );
+					memset(&current_task, 0, sizeof(current_task));
+					thread_state = TS_NONE;
+				}
 
 				rebuildstr();
 			}
