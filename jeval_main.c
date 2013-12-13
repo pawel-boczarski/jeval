@@ -2,21 +2,23 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+//#include <semaphore.h>
 
 #include "model_api.h"
 
+FILE *f;
+
 volatile char *curbuf = 0;
 volatile char **substrs = 0;
+
+pthread_mutex_t stack_mutex;
 
 // used for batch mode
 char *lastbuf = 0;
 
 int batch = 0;
 
-//#define my_getyx(s, y, x) do { if(!batch) getyx(s, y, x); } while(0)
-
-pthread_mutex_t mutex1 = PTHREAD_MUTEX_INITIALIZER;
-pthread_t current_task;
+thread_state_t current_task;
 
 int wait_pos = -1;
 
@@ -126,7 +128,7 @@ void write_tokens(WINDOW *win)
 
 	static char *tst[] = { "NONE", "WAITING", "OK", "RESPONSE", "CANCEL" };
 
-	mvwprintw(win, 0, 20, "[ thread state : '%s' ]", tst[thread_state]);	
+	mvwprintw(win, 0, 20, "[ thread state : '%s' ]", tst[current_task.state]);	
 
 	if(!substrs)
 	{
@@ -146,32 +148,81 @@ void write_tokens(WINDOW *win)
 
 char* get_token_from_end(int i)
 {
-	if(!substrs) return NULL;
+	if(pthread_mutex_lock(&stack_mutex) == 0)
+	{
+	if(!substrs) return pthread_mutex_unlock(&stack_mutex), NULL;
 
 	int last = 0; for( ; substrs[last] ; ++last); --last;
 
 	if(last - i < 0)
-		return NULL;
+		return pthread_mutex_unlock(&stack_mutex), NULL;
 
-	else return substrs[last - i];
+	else return pthread_mutex_unlock(&stack_mutex), substrs[last - i];
+	}
+	else
+	{
+		fprintf(stderr, "pop_last_token: Error locking mutex!\n");
+		abort();
+	}
 }
 
 int get_token_last_no()
 {
+	if(pthread_mutex_lock(&stack_mutex) == 0)
+	{
+
 	if(!substrs)
-		return -1;
-	int last = 0; for( ; substrs[last]; ++last); return last - 1;
+		return pthread_mutex_unlock(&stack_mutex), -1;
+	int last = 0; for( ; substrs[last]; ++last); return pthread_mutex_unlock(&stack_mutex), (last - 1);
+	
+	}
+	else
+	{
+		fprintf(stderr, "pop_last_token: Error locking mutex!\n");
+		abort();
+	}
 }
 
 void pop_last_token()
 {
+	if(pthread_mutex_lock(&stack_mutex) == 0)
+	{
+	fprintf(f, "pop_last_token\n");
+
+	int i = 0;
+	while(substrs[i] != 0)
+	{
+		fprintf(f, "%s ", substrs[i]);
+		++i;
+	}
+	fprintf(f, "\n");
+
 	int last = get_token_last_no();
 	if(last >= 0)
-	free(substrs[last]), substrs[last] = NULL;
+		free(substrs[last]), substrs[last] = NULL;
+	pthread_mutex_unlock(&stack_mutex);
+	}
+	else
+	{
+		fprintf(stderr, "pop_last_token: Error locking mutex!\n");
+		abort();
+	}
 }
 
 void push_token(char *tok)
 {
+	if(pthread_mutex_lock(&stack_mutex) == 0)
+	{
+	fprintf(f, "push_token(%s)\n", tok);
+
+	int i = 0;
+	while(substrs[i] != 0)
+	{
+		fprintf(f, "%s ", substrs[i]);
+		++i;
+	}
+	fprintf(f, "\n");
+
 	int currsize = get_token_last_no() + 2;
 
 	tok = strdup(tok);
@@ -183,6 +234,13 @@ void push_token(char *tok)
 
 	substrs[currsize] = 0;
 	substrs[currsize - 1] = tok;
+	pthread_mutex_unlock(&stack_mutex);
+	}
+	else
+	{
+		fprintf(stderr, "push_token: Error locking mutex!\n");
+		abort();
+	}
 }
 
 void * get_op(char *name)
@@ -199,6 +257,8 @@ void * get_op(char *name)
 
 int main(int argc, char *argv[])
 {
+	f = fopen("debug.txt", "w+");
+
 	WINDOW *win;
 	int ch;
 	int batch = 0;
@@ -212,6 +272,18 @@ int main(int argc, char *argv[])
 
 		if(strcmp(argv[i], "--no-chain-eval") == 0)
 			no_chain_eval = 1;
+	}
+
+	pthread_mutexattr_t ops;
+
+	pthread_mutexattr_init(&ops);
+
+	pthread_mutexattr_settype(&ops, PTHREAD_MUTEX_RECURSIVE);
+
+	if(0 != pthread_mutex_init(&stack_mutex, &ops))
+	{
+		fprintf(stderr, "Error initializing stack semaphore!\n");
+		abort();
 	}
 
 	if(!batch)
@@ -235,11 +307,6 @@ int main(int argc, char *argv[])
 	}
 
 	while((!batch && ch != 27) || (batch && ch != 13 && ch != 10 && !endflag ) ) {
-
-		// some ops may leave operator on stack and it needs to be evaluated
-		//if(curbuf[strlen(curbuf) - 1] == ' ')
-		//{
-		//}
 
 		if(!batch)
 			ch = getch();
@@ -289,10 +356,10 @@ int main(int argc, char *argv[])
 
 				if(curbuf_len() - 1 < wait_pos)
 				{
-					thread_state = TS_CANCEL;
-					pthread_join( current_task, NULL );
+					current_task.state = TS_CANCEL;
+					pthread_join( current_task.thread, NULL );
 					memset(&current_task, 0, sizeof(current_task));
-					thread_state = TS_NONE;
+					current_task.state = TS_NONE;
 				}
 			}
 			curbuf_delete_char();
@@ -305,20 +372,23 @@ int main(int argc, char *argv[])
 
 			if(tok)
 			{
-			if(thread_state == TS_NONE)
+			if(current_task.state == TS_NONE)
 			{
-				void (*op)() = get_op(tok);
+				void (*op)(thread_state_t *) = get_op(tok);
 				if(op)
 				{
-					pthread_create( &current_task, NULL, op, NULL );
-					while( thread_state == TS_NONE) nanosleep(&sleep_interval, NULL);
-					if( thread_state == TS_OK)
+					current_task.state = TS_NONE;
+					current_task.parent = NULL;
+
+					pthread_create( &current_task, NULL, op, &current_task );
+					while( current_task.state == TS_NONE) nanosleep(&sleep_interval, NULL);
+					if( current_task.state == TS_OK)
 					{
-						pthread_join( current_task, NULL );
+						pthread_join( current_task.thread, NULL );
 						memset(&current_task, 0, sizeof(current_task));
-						thread_state = TS_NONE;
+						//current_task.state = TS_NONE;
 					}
-					else if( thread_state == TS_WAITING)
+					else if( current_task.state == TS_WAITING)
 					{
 						// to restore on cancel
 						wait_pos = curbuf_len();
@@ -336,13 +406,13 @@ int main(int argc, char *argv[])
 			}
 			else /*TS_WAITING */
 			{
-				thread_state = TS_RESPONSE;
-				while( thread_state == TS_RESPONSE) nanosleep(&sleep_interval, NULL);
-				if( thread_state == TS_OK)
+				current_task.state = TS_RESPONSE;
+				while( current_task.state == TS_RESPONSE) nanosleep(&sleep_interval, NULL);
+				if( current_task.state == TS_OK)
 				{
-					pthread_join( current_task, NULL );
+					pthread_join( current_task.thread, NULL );
 					memset(&current_task, 0, sizeof(current_task));
-					thread_state = TS_NONE;
+					current_task.state = TS_NONE;
 				}
 
 				rebuildstr();
@@ -397,6 +467,8 @@ int main(int argc, char *argv[])
 
 	if(!lastbuf && !curbuf)
 		printf("lastbuf and curbuf empty\n");
+
+	fclose(f);
 
 	return 0;
 }

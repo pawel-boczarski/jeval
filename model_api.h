@@ -5,22 +5,39 @@
 
 extern struct timespec sleep_interval;
 
-extern int thread_state;
+//extern int thread_state;
+
+typedef struct _thread_state_t {
+	pthread_t thread;
+	int state;
+	void *parent;
+} thread_state_t;
+
 
 struct op
 {
 	char *name;
-	void (*value);
+	void (*value)(thread_state_t *);
 };
 
 extern struct op ops[];
 
 // op -> main signalling
-#define SIGNAL_OK() (thread_state = TS_OK)
+#define SIGNAL_OK(thrp) do { thrp->state = TS_OK; } while(0)
 
-#define SIGNAL_WAIT() do { thread_state = TS_WAITING; do { \
+#define SIGNAL_WAIT(thrp) do { thrp->state = TS_WAITING; do { \
 		nanosleep(&sleep_interval, NULL); \
-		} while(thread_state == TS_WAITING); } while(0)
+		} while(thrp->state == TS_WAITING); } while(0)
+
+
+// main -> op signamlling
+
+#define WAIT_FOR_CHILD_FIRST_RESP(thrp)	\
+	do { while( thrp->state == TS_NONE) nanosleep(&sleep_interval, NULL); } while(0)
+
+#define WAIT_FOR_CHILD_NEXT_RESP(thrp)	\
+	do { while( thrp->state == TS_RESPONSE) nanosleep(&sleep_interval, NULL); } while(0)
+
 
 #define TS_NONE 0
 #define TS_WAITING 1
