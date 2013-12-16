@@ -56,7 +56,7 @@ void _plus(thread_state_t *thrp)
 		a = atoi(tok1);
 		b = atoi(tok2);
 
-		sprintf(tok, "%d", a + b);
+		sprintf(tok, "%d", b + a);
 		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
@@ -164,7 +164,7 @@ void _minus(thread_state_t *thrp)
 		a = atoi(tok1);
 		b = atoi(tok2);
 
-		sprintf(tok, "%d", a - b);
+		sprintf(tok, "%d", b - a);
 		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
@@ -188,7 +188,7 @@ void _mul(thread_state_t *thrp)
 		a = atoi(tok1);
 		b = atoi(tok2);
 
-		sprintf(tok, "%d", a * b);
+		sprintf(tok, "%d", b * a);
 		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
@@ -212,7 +212,7 @@ void _div(thread_state_t *thrp)
 		a = atoi(tok1);
 		b = atoi(tok2);
 
-		sprintf(tok, "%d", a / b);
+		sprintf(tok, "%d", b / a);
 		tok = realloc(tok, strlen(tok) + 1);
 
 		pop_last_token();
@@ -301,6 +301,8 @@ void _nelem(thread_state_t *thrp)
 
 	snprintf(new_token, 50, "%d", n);
 
+	new_token = realloc(new_token, strlen(new_token) + 1);
+
 	pop_last_token(); // nelem
 
 	push_token(new_token);
@@ -330,6 +332,7 @@ void _rep(thread_state_t *thrp)
 	{
 		noper = 0;
 		bra_not = 1;
+		int nest = 0;
 
 		do
 		{
@@ -337,7 +340,12 @@ void _rep(thread_state_t *thrp)
 			oper = get_token_from_end(0);
 
 			if(strcmp(oper, "]") == 0)
-			break;
+			{
+				if(nest > 0) --nest;
+				else break;
+			}
+
+			if(strcmp(oper, "[") == 0) ++nest;
 
 			noper++;
 
@@ -500,6 +508,62 @@ void _nil(thread_state_t *thrp)
 	pop_last_token();
 }
 
+void _dup(thread_state_t *thrp)
+{
+	char *last_tok = get_token_from_end(1);
+
+	if(!last_tok) {
+		SIGNAL_OK(thrp);
+		return;
+	}
+	else
+	{
+		char *new_tok = strdup(last_tok);
+
+		pop_last_token();	// dup
+		push_token(new_tok);
+
+		SIGNAL_OK(thrp);
+	}
+}
+
+void _distdup(thread_state_t *thrp)
+{
+	char *dist = get_token_from_end(1);
+
+	if(!dist)
+	{
+		SIGNAL_OK(thrp);
+		return;
+	}
+	
+	int distance = atoi(dist);
+
+	distance = distance + 2; // omit 'distdup' and count
+
+	if(distance < 0) // no service yet
+	{
+		SIGNAL_OK(thrp);
+		return;
+	}
+
+	char *token_to_dup = get_token_from_end(distance);
+
+	if(!dist)
+	{
+		SIGNAL_OK(thrp);
+		return;
+	}
+
+	token_to_dup = strdup(token_to_dup);
+
+	pop_last_token(); // distdup
+	pop_last_token();
+	push_token(token_to_dup);
+
+	SIGNAL_OK(thrp);
+}
+
 void _chain_eval(thread_state_t *thrp)
 {
 	if(get_token_last_no() == 0)
@@ -542,6 +606,8 @@ struct op ops[] = {
 	{ "rep", &_rep },
 	{ "if", &_if },
 	{ "nil", &_nil },
+	{ "dup", &_dup },
+	{ "distdup", &_distdup },
 	{ ",", &_chain_eval },
 	{ NULL, NULL }
 };
