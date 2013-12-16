@@ -97,11 +97,44 @@ Sample:
 1 2 3 4 nelem
 ==> yields 1 2 3 4 4
 
+OPERATOR: dup
+SYNTAX: op1 dup
+        op1 - token to duplicate
+
+The dup operator duplicates last token on stack.
+This operation may be necessary to perform some operation on token while still preserving
+this token, as most operations destroy tokens they operate on.
+
+Example:
+0 1 2 3 4 5 dup
+=> yields 0 1 2 3 4 5 5
+
+10 dup + 
+=> yields 20
+
+3 dup dup
+=> yields 3 3 3
+
+1 2 dup 5 +
+=> yields 1 2 7
+
+Compare the last to example without dup:
+1 2 5 +
+=> yields 1 7
+
+In the first case token '2' was copied before operation '+' that destroys operands!
+
 OPERATOR: rep
 
-Syntax: op op op op ... op1 rep op2
-	where op1 - number of repetitions
+Syntax: op op op op ... opn rep op2
+	where opn - number of repetitions
               op2 - operator to repete
+
+OR
+
+	op op op op ... opn rep [ op1 op2 ... opn ]
+	where opn - number of repetitions
+	op1 op2 ... opn - tokens (some of them operators) to repeat
 
 Sample:
 1 2 3 4 5 4 rep *
@@ -129,6 +162,66 @@ Or even better:
 11 rep nelem 9 rep * +
 
 => it produces zero on beginning, but + "eats" it.
+
+There are even more possibility to use rep operator in bracket form:
+
+10 rep [ 2 nelem * ] 
+
+=> yields 2 4 6 8 10 12 14 16 18 20
+
+10 rep [ nelem rep * ]
+=> yields 0 1 4 9 16 25 36 49 64 81
+
+10 rep [ nelem rep * ] 9 rep +
+=> yields sum of squares of numbers from 0 to 9
+
+
+And this one is not so easy, it displays 10 first triangle numbers.
+N-th triangle number is a sum t(n) = 1 + 2 + ... + n.
+
+Voila: 
+10 rep [ 0 nelem rep [ dup 1 + ] dup rep + ]
+=> yields 1 3 6 10 15 21 28 36 45 55
+
+I am not saying it's easy or even readable, but can do this even though we still don't have
+variables defined!!! (I wrote the correct expression after several fails :)).
+
+How it works?
+On the beginning of first repetitin of the outer loop, there is nothing on stack.
+So, after zero is put, and nelem then we have:
+0 nelem => 0 1
+then we have rep, so 1 will be treated as count of repetitions of [ dup 1 + ]:
+0 1 rep [ dup 1 + ] => 0 dup 1 + => 0 0 1 + => 0 1
+Then, the last number (this is number of iteration!) is duplicated:
+0 1 dup => 0 1 1
+And last element treated as number of repetitions of +:
+0 1 1 dup rep + => 0 1 + => 1
+
+Good. And what if it's not the first iteration? Let's say it's fourth one.
+We already have 1 3 6 (three numbers) on stack
+After 0 and is put we have:
+1 3 6 0
+Then is nelem:
+1 3 6 0 nelem => 1 3 6 0 4
+Then we have rep, so 4 will be treated as count of repetitions of [ dup 1 + ]:
+1 3 6 0 dup 1 + dup 1 + dup 1 + dup 1 + => 1 3 6 0 0 1 + dup 1 + dup 1 + dup 1 + =>
+=> 1 3 6 0 1 dup 1 + dup 1 + dup 1 + => 1 3 6 0 1 1 1 + dup 1 + dup 1 + =>
+=> 1 3 6 0 1 2 dup 1 + dup 1 + => 1 3 6 0 1 2 2 1 + dup 1 + => 1 3 6 0 1 2 3 dup 1 + =>
+=> 1 3 6 0 1 2 3 3 1 + => 1 3 6 0 1 2 3 4
+Then, after inner loop is dup:
+1 3 6 0 1 2 3 4 dup => 1 3 6 0 1 2 3 4 4
+and then is 'rep' and '+' - so the freshly duplicated number is a number of repetitions of +,
+effectively counting 0 + 1 + 2 + 3 + 4:
+1 3 6 0 1 2 3 4 4 rep + => 1 3 6 0 1 2 3 4 + + + + => 1 3 6 0 1 2 7 + + + => 1 3 6 0 1 9 + + =>
+1 3 6 0 10 + => 1 3 6 10
+
+Well, we came here from having three consecutive triangle numbers to having four consecutive triangle numbers!
+
+Could you do this even easier, without unnecessary "counting from beginning", using the last number on stack?
+
+Or, maybe, why not count n-th triangle number using a mathematical expression for n-th triangle number?
+(the mathematical expression to count n-th triangle number without adding one by one is:
+ t(n) = n(n+1)/2 ) ?
 
 OPERATOR: if
 SYNTAX: op_cond if op_true op_false
@@ -182,12 +275,38 @@ Example:
 => yields 150
 
 
+
+
 Note: using double space after an expression works exactly same as calling chain-eval operator.
 
+OPERATOR: nil
+SYNTAX: nil
+
+Evals to nothing. This operator will simply dissapear without affecting the rest of expression.
+You can use it as a placeholder in 'if' expressions, if given case (true or false) does not require
+any change on the stack.
+
+OPERATOR: distdup
+SYNTAX: op0 op1 ... opn dist distdup
+	dist - distance of token to duplicate
+
+It works similar to dup, but instead duplicates a token at given distance from the operator.
+If dist is 0, opn will be duplicated, and it works exactly as dup. If dist is 1, the token
+right before opn will be duplicated and so on. Keep in mind that dist is distance from the last
+token preceding distance count!
+
+Examples:
+
+0 1 2 3 4 5 2 distdup
+=> yields 0 1 2 3 4 5 3
+
+0 1 2 3 4 5 0 distdup
+=> yields 0 1 2 3 4 5 5
+
+I don't have more examples yet, but can you utilize distdup in some way ?
+Feel free to experiment :). 
+
 Enjoy :).
-
-
-
 
 Note: it's not necessary to press ENTER after expression in ncurses mode, space is sufficient.
 You can always back out by removing any part of expression you like with Backspace.
