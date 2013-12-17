@@ -464,7 +464,7 @@ void _rep(thread_state_t *thrp)
 
 void _if(thread_state_t *thrp)
 {
-	char *last_tok = strdup(get_token_from_end(1));
+	char *last_tok = get_token_from_end(1);
 
 	if(!last_tok) {
 		SIGNAL_OK(thrp);
@@ -472,33 +472,153 @@ void _if(thread_state_t *thrp)
 	}
 	else
 	{
-		SIGNAL_WAIT(thrp);
-		SIGNAL_WAIT(thrp);
+		last_tok = strdup(last_tok);
 
-		char *tok_true = get_token_from_end(1);
-		char *tok_false = get_token_from_end(0);
-		char *tok_push=  NULL;
+		int isTrue = 1;
+		if(strcmp(last_tok, "0.0") == 0 || strcmp(last_tok, "0") == 0)
+			isTrue = 0;
 
-		if((strcmp(last_tok, "0") == 0) || (strcmp(last_tok, "0.0") == 0))
+		int no_true = 0;
+		int no_false = 0;
+		char **oper_tbl = calloc(1, sizeof(char*));
+		//char **oper_tbl_false = calloc(1, sizeof(char*));
+		int bra_true = 0;
+		int bra_false = 0;
+
+		SIGNAL_WAIT(thrp);
+		//SIGNAL_WAIT(thrp);
+		int nest = 0;
+
+		char *tok_true = get_token_from_end(0);
+		if(strcmp(tok_true, "[") != 0)
 		{
-			tok_push = strdup(tok_false);	
+			no_true = 1;
+			if(isTrue) oper_tbl[0] = strdup(tok_true);
 		}
-		else
+		else do
 		{
-			tok_push = strdup(tok_true);
+			bra_true = 1;
+			SIGNAL_WAIT(thrp);
+			tok_true = get_token_from_end(0);
+
+			if(strcmp(tok_true, "[") == 0)
+				nest++;
+			
+			if(strcmp(tok_true, "]") == 0) 
+			{
+				if(nest > 0) nest--;
+				else break;
+			}
+
+			no_true++;
+			if(isTrue)
+			{
+				oper_tbl = realloc(oper_tbl, no_true * sizeof(char*));
+				oper_tbl[no_true-1] = strdup(tok_true);
+			}
+		} while(1);
+
+		SIGNAL_WAIT(thrp);
+		nest = 0;
+
+		char *tok_false = get_token_from_end(0);
+		if(strcmp(tok_false, "[") != 0)
+		{
+			no_false = 1;
+			if(!isTrue) oper_tbl[0] = strdup(tok_false);
+		} else do
+		{
+			bra_false= 1;
+			SIGNAL_WAIT(thrp);
+			tok_false = get_token_from_end(0);
+
+			if(strcmp(tok_false, "[") == 0)
+				nest++;
+			
+			if(strcmp(tok_false, "]") == 0) 
+			{
+				if(nest > 0) nest--;
+				else break;
+			}
+
+//			if(strcmp(tok_false, "]") == 0) break;
+			no_false++;
+			if(!isTrue)
+			{
+				oper_tbl = realloc(oper_tbl, no_false * sizeof(char*));
+				oper_tbl[no_false-1] = strdup(tok_false);
+			}
+		} while(1);
+
+
+		int i;
+		for(i = 0; i < no_true + bra_true * 2 + no_false + bra_false * 2; i++)
+			pop_last_token();
+		//pop_last_token();
+		//pop_last_token();
+		pop_last_token();	// if
+		pop_last_token();
+
+		int count = isTrue ? no_true : no_false;
+		for(i = 0; i < count; i++)
+		{
+			// sketch
+			push_token(oper_tbl[i]);
+			void (*op)(thread_state_t *) = get_op(oper_tbl[i]);
+
+			if(op)
+			{
+				thread_state_t *new_thrp = calloc(1, sizeof(thread_state_t));
+			
+				new_thrp->state = TS_NONE;
+				new_thrp->parent = thrp;
+
+				pthread_create( new_thrp, NULL, op, new_thrp );
+
+				WAIT_FOR_CHILD_FIRST_RESP(new_thrp);
+
+				if(new_thrp->state == TS_OK)
+				{	
+					SIGNAL_OK(thrp);
+					pthread_join( new_thrp->thread, NULL );
+					free(new_thrp);
+				}
+				else
+				while(new_thrp->state == TS_WAITING)
+				{
+					++i;
+
+					if(i < count)
+					{
+						char *oper_token_2 = strdup(oper_tbl[i]);
+						push_token(oper_token_2);
+
+						new_thrp->state = TS_RESPONSE;
+					}
+					else /* loop ended - wait for missing token from stdin */
+					{
+						SIGNAL_WAIT(thrp);
+						new_thrp->state = TS_RESPONSE;	
+					}
+
+					WAIT_FOR_CHILD_NEXT_RESP(new_thrp);
+	
+					if(new_thrp->state == TS_OK)
+					{
+						//SIGNAL_OK(thrp);
+						pthread_join( new_thrp->thread, NULL );
+						free(new_thrp);
+					}
+				}
+			}
 		}
 
 		SIGNAL_OK(thrp);
 
-		pop_last_token();
-		pop_last_token();
-		pop_last_token();
-		pop_last_token();
 
-		push_token(tok_push);
-
-		free(last_tok);
 	}
+
+	free(last_tok);
 }
 
 void _nil(thread_state_t *thrp)
@@ -525,6 +645,21 @@ void _dup(thread_state_t *thrp)
 
 		SIGNAL_OK(thrp);
 	}
+}
+
+void _pop(thread_state_t *thrp)
+{
+	char *last_tok = get_token_from_end(1);
+
+	if(!last_tok) {
+		SIGNAL_OK(thrp);
+		return;
+	}
+
+	SIGNAL_OK(thrp);
+
+	pop_last_token();	// pop
+	pop_last_token();
 }
 
 void _distdup(thread_state_t *thrp)
@@ -607,6 +742,7 @@ struct op ops[] = {
 	{ "if", &_if },
 	{ "nil", &_nil },
 	{ "dup", &_dup },
+	{ "pop", &_pop },
 	{ "distdup", &_distdup },
 	{ ",", &_chain_eval },
 	{ NULL, NULL }
