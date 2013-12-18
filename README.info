@@ -225,10 +225,35 @@ Or, maybe, why not count n-th triangle number using a mathematical expression fo
 
 OPERATOR: if
 SYNTAX: op_cond if op_true op_false
+
 	op_cond - true or false value - "0" and "0.0" evaluate to false,
                   others - to true
-        op_true - operand to be pushed on stack when true
-        op_false - operand to be pushed on stack when false
+        op_true - token to be pushed on stack (and evaluated if possible) when op_cond is non-zero
+        op_false - token to be pushed on stack (and evaluated if possible) when op_cond is 0 (or 0.0)
+
+OR
+	op_cond if [ op_true1 op_true2 ... op_truen ] [ op_false1 op_false2 ... op_falsen ]
+
+	op_cond - true or false value - "0" and "0.0" evaluate to false,
+                  others - to true
+	op_true1 ... op_truen - tokens to be pushed on stack (and evaluated if possible) when op_cond is non-zero
+	op_false1 ... op_falsen - tokens to be pushed on stack (and evaluated if possible) when op_cond is zero
+OR
+	op_cond if op_true [ op_false1 op_false2 ... op_falsen ]
+
+	op_cond - true or false value - "0" and "0.0" evaluate to false,
+                  others - to true
+        op_true -  token to be pushed on stack (and evaluated if possible) when op_cond is non-zero
+	op_false1 ... op_falsen - tokens to be pushed on stack (and evaluated if possible) when op_cond is zero
+
+OR
+	op_cond if [ op_true1 op_true2 ... op_truen ] op_false
+
+	op_cond - true or false value - "0" and "0.0" evaluate to false,
+                  others - to true
+	op_true1 ... op_truen - tokens to be pushed on stack (and evaluated if possible) when op_cond is non-zero
+        op_false - token to be pushed on stack (and evaluated if possible) when op_cond is zero
+
 
 Sample:
 
@@ -242,19 +267,12 @@ Sample:
 
 10 15 0 if * + 
 
-=> yields 10 15 +
+=> yields 25
 
 10 15 1.0 if * +
 
-=> yields 10 15 *
+=> yields 150
 
-WARNING: The operator will not be evaluated by default !!!
-This is because sometimes when operation fails operator may remain on the stack,
-and we would enter an infinite loop. So operators left on stack by operators
-are NOT evaluated at once. They can be evaluated in two ways:
-
-- adding second space after expression to force evaluation,
-- using chain-eval operator
 
 OPERATOR: , 	[aka chain-eval operator]
 SYNTAX: op ,
@@ -264,20 +282,11 @@ SYNTAX: op ,
 Chain-eval operator simply evaluates the last operator on stack. If there is no operator function
 for it, it exits. If not, it pops itself off stack and calls the preceding operator.
 
-Example:
+Note: currently it's probably not necessary (former 'if' semantics didn't evaluate pushed operators).
 
-10 15 0 if * + ,
+It only makes sense after calling function that may push operands on stack and not evaluate them.
 
-=> yields 25
-
-10 15 1 if * + ,
-
-=> yields 150
-
-
-
-
-Note: using double space after an expression works exactly same as calling chain-eval operator.
+Using double space after an expression works exactly same as calling chain-eval operator.
 
 OPERATOR: nil
 SYNTAX: nil
@@ -285,6 +294,17 @@ SYNTAX: nil
 Evals to nothing. This operator will simply dissapear without affecting the rest of expression.
 You can use it as a placeholder in 'if' expressions, if given case (true or false) does not require
 any change on the stack.
+
+OPERATOR: pop
+SYNTAX: op1 pop
+
+Pops last operator from the stack.
+
+Example:
+1 2 3 4 pop
+=> yields 1 2 3
+1 2 3 4 5 6 7 8 9 10 5 rep pop
+=> yields 1 2 3 4 5
 
 OPERATOR: distdup
 SYNTAX: op0 op1 ... opn dist distdup
