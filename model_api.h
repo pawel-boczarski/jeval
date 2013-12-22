@@ -1,6 +1,7 @@
 #ifndef MODEL_API
 #define MODEL_API
 
+#include <pthread.h>
 #include <time.h>
 
 extern struct timespec sleep_interval;
@@ -71,5 +72,21 @@ void push_token(char *tok);
  Used by those operators, that operate on other operators
 */
 void * get_op(char *name);
+
+
+/*
+ sets a variable
+*/
+int set_var(char *name, char *value);
+
+/*
+ gets a variable
+*/
+char* get_var(char *name);
+
+/*
+ destroys a variable
+*/
+int unset_var(char *name);
 
 #endif

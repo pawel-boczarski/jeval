@@ -22,7 +22,7 @@ thread_state_t current_task;
 
 int wait_pos = -1;
 
-struct timespec sleep_interval = { .tv_sec = 0, .tv_nsec = 1000000 };
+struct timespec sleep_interval = { .tv_sec = 0, .tv_nsec = 1 };
 
 int thread_state = 0;
 

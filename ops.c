@@ -839,6 +839,93 @@ void _chain_eval(thread_state_t *thrp)
 	}
 }
 
+void _lass(thread_state_t *thrp)
+{
+	if(get_token_last_no() == 0)
+	{
+		SIGNAL_OK(thrp);
+		return;
+	}
+
+	SIGNAL_WAIT(thrp);
+
+	char *name = get_token_from_end(2);
+	char *val = get_token_from_end(0);
+
+	set_var(name, val);
+
+	pop_last_token();
+	pop_last_token();
+	pop_last_token();
+
+	SIGNAL_OK(thrp);
+}
+
+void _rass(thread_state_t *thrp)
+{
+	if(get_token_last_no() == 0)
+	{
+		SIGNAL_OK(thrp);
+		return;
+	}
+
+	SIGNAL_WAIT(thrp);
+
+	char *name = get_token_from_end(0);
+	char *val = get_token_from_end(2);
+
+	set_var(name, val);
+
+	pop_last_token();
+	pop_last_token();
+	pop_last_token();
+
+	SIGNAL_OK(thrp);
+}
+
+
+void _val(thread_state_t *thrp)
+{
+	if(get_token_last_no() == 0)
+	{
+		SIGNAL_OK(thrp);
+		return;
+	}
+
+	char *name = get_token_from_end(1);
+
+	char *val = get_var(name);
+
+	if(val) {
+		pop_last_token();
+		pop_last_token();
+		push_token(strdup(val));
+	} else {
+		push_token(strdup("?"));
+	}
+	
+	SIGNAL_OK(thrp);
+}
+
+void _unset(thread_state_t *thrp)
+{
+	if(get_token_last_no() == 0)
+	{
+		SIGNAL_OK(thrp);
+		return;
+	}
+
+	char *name = get_token_from_end(1);
+
+	unset_var(name);
+
+	pop_last_token();
+	pop_last_token();
+	
+	SIGNAL_OK(thrp);
+}
+
+
 struct op ops[] = {
 	{ "+", &_plus },
 	{ "-", &_minus },
@@ -849,6 +936,11 @@ struct op ops[] = {
 	{ "<=", &_lesseq },
 	{ ">=", &_moreeq },
 	{ "=", &_eq },
+
+	{ "<-", &_lass },
+	{ "->", &_rass },
+	{ "val", &_val },
+	{ "unset", &_unset },
 
 	{ "mod", &_mod },
 	{ "++", &_new_plus },
