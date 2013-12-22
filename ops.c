@@ -223,6 +223,117 @@ void _div(thread_state_t *thrp)
 	}		
 }
 
+void _less(thread_state_t *thrp)
+{
+	int a, b;
+	char *tok1, *tok2;
+
+	SIGNAL_OK(thrp);
+
+	if( (tok1 = get_token_from_end(1)) && (tok2 = get_token_from_end(2)) )
+	{
+		char *tok = malloc(50);
+		a = atoi(tok1);
+		b = atoi(tok2);
+
+		sprintf(tok, "%d", b < a ? 1 : 0);
+		tok = realloc(tok, strlen(tok) + 1);
+
+		pop_last_token();
+
+		push_token(tok);
+	}		
+}
+
+void _more(thread_state_t *thrp)
+{
+	int a, b;
+	char *tok1, *tok2;
+
+	SIGNAL_OK(thrp);
+
+	if( (tok1 = get_token_from_end(1)) && (tok2 = get_token_from_end(2)) )
+	{
+		char *tok = malloc(50);
+		a = atoi(tok1);
+		b = atoi(tok2);
+
+		sprintf(tok, "%d", b > a ? 1 : 0);
+		tok = realloc(tok, strlen(tok) + 1);
+
+		pop_last_token();
+
+		push_token(tok);
+	}		
+}
+
+void _lesseq(thread_state_t *thrp)
+{
+	int a, b;
+	char *tok1, *tok2;
+
+	SIGNAL_OK(thrp);
+
+	if( (tok1 = get_token_from_end(1)) && (tok2 = get_token_from_end(2)) )
+	{
+		char *tok = malloc(50);
+		a = atoi(tok1);
+		b = atoi(tok2);
+
+		sprintf(tok, "%d", b <= a ? 1 : 0);
+		tok = realloc(tok, strlen(tok) + 1);
+
+		pop_last_token();
+
+		push_token(tok);
+	}		
+}
+
+void _moreeq(thread_state_t *thrp)
+{
+	int a, b;
+	char *tok1, *tok2;
+
+	SIGNAL_OK(thrp);
+
+	if( (tok1 = get_token_from_end(1)) && (tok2 = get_token_from_end(2)) )
+	{
+		char *tok = malloc(50);
+		a = atoi(tok1);
+		b = atoi(tok2);
+
+		sprintf(tok, "%d", b >= a ? 1 : 0);
+		tok = realloc(tok, strlen(tok) + 1);
+
+		pop_last_token();
+
+		push_token(tok);
+	}		
+}
+
+void _eq(thread_state_t *thrp)
+{
+	int a, b;
+	char *tok1, *tok2;
+
+	SIGNAL_OK(thrp);
+
+	if( (tok1 = get_token_from_end(1)) && (tok2 = get_token_from_end(2)) )
+	{
+		char *tok = malloc(50);
+		a = atoi(tok1);
+		b = atoi(tok2);
+
+		sprintf(tok, "%d", b == a ? 1 : 0);
+		tok = realloc(tok, strlen(tok) + 1);
+
+		pop_last_token();
+
+		push_token(tok);
+	}		
+}
+
+
 void _mod(thread_state_t *thrp)
 {
 	int a, b;
@@ -733,6 +844,12 @@ struct op ops[] = {
 	{ "-", &_minus },
 	{ "*", &_mul },
 	{ "/", &_div },
+	{ "<", &_less },
+	{ ">", &_more },
+	{ "<=", &_lesseq },
+	{ ">=", &_moreeq },
+	{ "=", &_eq },
+
 	{ "mod", &_mod },
 	{ "++", &_new_plus },
 //	{ "r+", &_reverse_plus },
